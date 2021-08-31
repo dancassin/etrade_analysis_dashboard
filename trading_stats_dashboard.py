@@ -40,7 +40,7 @@ time_periods = {1:ttm, 2:ytd, 3:t_minus_90, 4:t_minus_30}
 # -----------------------------------------------------------
 # Data Processing
 
-FILEPATH = '/Users/DanCassin/Development/python/minervini_stock_selector/TTM_tax_lots_083021.csv'
+FILEPATH = './data/TTM_tax_lots_083021.csv'
 
 tax_lot_df = pd.read_csv(FILEPATH,
             usecols=[
@@ -131,13 +131,29 @@ def gain_loss_hist(jsonified_cleaned_data):
 
     df = pd.read_json(jsonified_cleaned_data)
 
-    fig = px.histogram(
-        df, 
-        x='pct_gain/loss',
-        nbins=50,
-        labels={'x':'% Gain of Loss', 'y':'Trade Count'})
+    mean_pct = round(df['pct_gain/loss'].mean(), 2)
+    median_pct = round(df['pct_gain/loss'].median(), 2)
 
+    # fig = px.histogram(
+    #     df, 
+    #     x='pct_gain/loss',
+    #     nbins=50,
+    #     marker_color='black')
 
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x = df['pct_gain/loss'],
+        marker={
+            'color':'#D6D6D6', #'#8E9AAF'
+        },
+
+    ))
+    fig.update_layout(
+        xaxis_title_text= f'% Gain & Loss\nMean: {mean_pct}% \n Median: {median_pct}%', # xaxis label
+        yaxis_title_text='Total Trades', # yaxis label),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
+    )
     return fig
 
 
