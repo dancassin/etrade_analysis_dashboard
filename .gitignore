@@ -1,0 +1,5 @@
+*.pdf
+*.csv
+*.p
+*.env
+./forms
