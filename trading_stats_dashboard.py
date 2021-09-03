@@ -1,3 +1,4 @@
+from numpy.lib.function_base import median
 import pandas as pd
 import numpy as np
 import datetime
@@ -40,7 +41,7 @@ time_periods = {1:ttm, 2:ytd, 3:t_minus_90, 4:t_minus_30}
 # -----------------------------------------------------------
 # Data Processing
 
-FILEPATH = './data/TTM_tax_lots_083021.csv'
+FILEPATH = './data/TTM_tax_lots_090321.csv'
 
 tax_lot_df = pd.read_csv(FILEPATH,
             usecols=[
@@ -68,12 +69,16 @@ tax_lot_df['closing_date'] = tax_lot_df['closing_date'].astype('Datetime64')
 
 tax_lot_df['pct_gain/loss'] = round((tax_lot_df['gain'] / tax_lot_df['total_cost']) * 100, 2)
 
+tax_lot_df['category'] = pd.cut(tax_lot_df.gain, bins=[-5000, .0001, 5000],
+    labels=['loss','gain'])
+
 # # -----------------------------------------------------------
 # # Layout
 app.layout = dbc.Container([
     html.Div([
         html.Br(),
-        html.H1('Trading Performance', style={'align':'left'}),
+        html.H1('Trading Performance', style={'text-align':'left'}),
+        html.Hr()
         ]
     ),
     html.Div([
@@ -86,31 +91,63 @@ app.layout = dbc.Container([
             marks={
                 1 : 'TTM',
                 2 : 'YTD',
-                3 : '90 Days',
-                4 : '30 Days',
+                3 : '90Days',
+                4 : '30Days',
             },
-            value=2,
+            value=1,
         ),
         
     ]),
     #html.Div(id='slider-drag-output'),
-    html.Br(),
     html.Div(
         [
             dbc.Row(
                 [
                     dbc.Col(
-                        dcc.Graph(id='gain_loss_hist'),
-                        width={'size':4},
-                    ),
-                    dbc.Col(
                         dcc.Graph(id='gain_hist'),
-                        width={'size':4},
+                        width={'size':8},
                     ),
-                    dbc.Col(
-                        dcc.Graph(id='loss_hist'),
-                        width={'size':4},
-                    ),
+                    dbc.Col(    
+                        [   
+                            html.Br(),
+                            dbc.Card(
+                                dbc.CardBody(
+                                    [   
+                                        html.H6("Reward / Risk"), #className="card-subtitle"),
+                                        html.H4("Title", #className="card-title", 
+                                            id='risk_reward_num'),
+                                    ]
+                                ),
+                                style={'text-align':'center'}
+                                
+                            ),
+                            #width = {'size':2, 'offset':1},
+                            html.Br(),
+                            dbc.Card(
+                                dbc.CardBody(
+                                    [   
+                                        html.H6("Winning Trades"), #className="card-subtitle"),
+                                        html.H4("Title", id='total_winning'),
+                                    ]
+                                ),
+                                style={'text-align':'center'}
+                                
+                            ),
+                            html.Br(),
+                            dbc.Card(
+                                dbc.CardBody(
+                                    [   
+                                        html.H6("Losing Trades"), #className="card-subtitle"),
+                                        html.H4("Title", id='total_losing'),
+                                    ]
+                                ),
+                                style={'text-align':'center'}
+                                
+                            ),
+                            #
+                        ],
+                        width = {'size':2, 'offset':1}
+                    )    
                 ]
             )
         ]
@@ -126,37 +163,62 @@ def setting_date_filter(selected_time):
 
     return sub_df.to_json()
 
-@app.callback(Output('gain_loss_hist', 'figure'), [Input('sub_df', 'data')])
-def gain_loss_hist(jsonified_cleaned_data):
+@app.callback(Output('gain_hist', 'figure'), [Input('sub_df', 'data')])
+def avg_gain(jsonified_cleaned_data):
+
+    df = pd.read_json(jsonified_cleaned_data)
+    
+    gain_df = df[df['category'] == 'gain']
+    loss_df = df[df['category'] == 'loss']
+
+    gain_mean_pct = round(gain_df['pct_gain/loss'].median(), 2)
+    loss_mean_pct = round(loss_df['pct_gain/loss'].median(), 2)
+
+    fig =px.histogram(
+        df.sort_values(by='category'), x="pct_gain/loss",
+        marginal='box', color='category',
+        nbins=int(df.shape[0] / 2),
+        color_discrete_map = {'gain':'#63C9C4', 'loss':'gray'},
+        # labels={
+        #     'gain':'Gain<br>Mean: {}'.format(gain_mean_pct),
+        #     'loss': f'Loss<br>Mean: {loss_mean_pct}'
+        # }
+        )   
+
+    fig.update_layout(
+        xaxis_title_text= f'% Gain/Loss', # xaxis label
+        yaxis_title_text='', # yaxis label
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=True,
+        legend_x=.8,
+        legend_y=.5
+    )
+
+    fig.data[0].name = f'Gain<br>(Median: {gain_mean_pct}%)'
+    fig.data[2].name = f'Loss<br>(Median: {loss_mean_pct}%)'
+
+    return fig
+
+@app.callback([Output('risk_reward_num', 'children'),
+            Output('total_winning', 'children'),
+            Output('total_losing', 'children')], 
+            [Input('sub_df', 'data')])
+def update_reward_risk(jsonified_cleaned_data):
 
     df = pd.read_json(jsonified_cleaned_data)
 
-    mean_pct = round(df['pct_gain/loss'].mean(), 2)
-    median_pct = round(df['pct_gain/loss'].median(), 2)
+    winning_trades = df[df['gain']> 0]
+    losing_trades = df[df['gain'] < 0]
 
-    # fig = px.histogram(
-    #     df, 
-    #     x='pct_gain/loss',
-    #     nbins=50,
-    #     marker_color='black')
+    total_winning_trades = winning_trades.shape[0]
+    total_losing_trades = losing_trades.shape[0]
 
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(
-        x = df['pct_gain/loss'],
-        marker={
-            'color':'#D6D6D6', #'#8E9AAF'
-        },
+    avg_gain = round(winning_trades['gain'].median(), 2)
+    avg_loss = abs(round(losing_trades['gain'].median(), 2))
 
-    ))
-    fig.update_layout(
-        xaxis_title_text= f'% Gain & Loss\nMean: {mean_pct}% \n Median: {median_pct}%', # xaxis label
-        yaxis_title_text='Total Trades', # yaxis label),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
-    return fig
-
-
+    reward_risk = round((total_winning_trades * avg_gain) / (total_losing_trades * avg_loss), 2)
+    return f'{reward_risk} : 1', total_winning_trades, total_losing_trades
 
 # -----------------------------------------------------------
 if __name__ == "__main__":
