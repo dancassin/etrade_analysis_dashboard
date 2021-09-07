@@ -2,7 +2,6 @@ from numpy.lib.function_base import median
 import pandas as pd
 import numpy as np
 import datetime
-import json
 
 import dash
 import dash_bootstrap_components as dbc
@@ -11,13 +10,8 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 from pandas.io.formats import style
 
-import plotly.graph_objs as go
 import plotly.express as px
 
-
-
-
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
 
@@ -36,7 +30,7 @@ t_minus_90 = today - datetime.timedelta(90)
 
 ttm = today - datetime.timedelta(365)
 
-time_periods = {1:ttm, 2:ytd, 3:t_minus_90, 4:t_minus_30}
+time_periods = {1:ytd, 2:ttm, 3:t_minus_90, 4:t_minus_30}
 
 # -----------------------------------------------------------
 # Data Processing
@@ -89,26 +83,27 @@ app.layout = dbc.Container([
             max=4,
             step=None,
             marks={
-                1 : 'TTM',
-                2 : 'YTD',
-                3 : '90Days',
-                4 : '30Days',
+                1 : 'YTD',
+                2 : 'TTM',
+                3 : '90D',
+                4 : '30D',
             },
             value=1,
         ),
         
     ]),
-    #html.Div(id='slider-drag-output'),
+    # html.Div(id='slider-drag-output'),
     html.Div(
         [
             dbc.Row(
                 [
                     dbc.Col(
                         dcc.Graph(id='gain_hist'),
-                        width={'size':8},
+                        width={'size':9},
                     ),
                     dbc.Col(    
                         [   
+                            html.Br(),
                             html.Br(),
                             dbc.Card(
                                 dbc.CardBody(
@@ -146,7 +141,8 @@ app.layout = dbc.Container([
                             ),
                             #
                         ],
-                        width = {'size':2, 'offset':1}
+                        width = {'size':2, #'offset':1
+                        }
                     )    
                 ]
             )
@@ -163,7 +159,9 @@ def setting_date_filter(selected_time):
 
     return sub_df.to_json()
 
-@app.callback(Output('gain_hist', 'figure'), [Input('sub_df', 'data')])
+@app.callback(Output('gain_hist', 'figure'),
+                #Output('slider-drag-output', 'children'), 
+                [Input('sub_df', 'data')])
 def avg_gain(jsonified_cleaned_data):
 
     df = pd.read_json(jsonified_cleaned_data)
@@ -179,12 +177,9 @@ def avg_gain(jsonified_cleaned_data):
         marginal='box', color='category',
         nbins=int(df.shape[0] / 2),
         color_discrete_map = {'gain':'#63C9C4', 'loss':'gray'},
-        # labels={
-        #     'gain':'Gain<br>Mean: {}'.format(gain_mean_pct),
-        #     'loss': f'Loss<br>Mean: {loss_mean_pct}'
-        # }
-        )   
 
+        )
+    
     fig.update_layout(
         xaxis_title_text= f'% Gain/Loss', # xaxis label
         yaxis_title_text='', # yaxis label
@@ -192,11 +187,19 @@ def avg_gain(jsonified_cleaned_data):
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=True,
         legend_x=.8,
-        legend_y=.5
+        legend_y=.5,
     )
-
+    
     fig.data[0].name = f'Gain<br>(Median: {gain_mean_pct}%)'
     fig.data[2].name = f'Loss<br>(Median: {loss_mean_pct}%)'
+
+    fig.add_annotation(text=f"Max Gain: <br>{round(max(gain_df['pct_gain/loss']))}%",
+                  xref="paper", yref="paper",
+                  x=1, y=-0.2, showarrow=False)
+    fig.add_annotation(text=f"Max Loss: <br>{round(min(loss_df['pct_gain/loss']))}%",
+                  xref="paper", yref="paper",
+                  x=0, y=-0.2, showarrow=False)
+                  
 
     return fig
 
@@ -218,7 +221,9 @@ def update_reward_risk(jsonified_cleaned_data):
     avg_loss = abs(round(losing_trades['gain'].median(), 2))
 
     reward_risk = round((total_winning_trades * avg_gain) / (total_losing_trades * avg_loss), 2)
-    return f'{reward_risk} : 1', total_winning_trades, total_losing_trades
+    return f'{reward_risk} : 1', \
+        f'{round(total_winning_trades/df.shape[0]*100)}%', \
+        f'{round(total_losing_trades/df.shape[0]*100)}%'
 
 # -----------------------------------------------------------
 if __name__ == "__main__":

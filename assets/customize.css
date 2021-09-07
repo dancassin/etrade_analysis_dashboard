@@ -5,13 +5,13 @@
   }
   
   .rc-slider-dot-active {  
-    border-color: #ADB5BD;
+    border-color: #63C9C4;
     border: solid 2px;
   }
   
   .rc-slider-handle {
     background-color: white;
-    border-color: #ADB5BD;
+    border-color: #63C9C4;
   }
   
   .rc-slider-handle:hover {
@@ -19,6 +19,6 @@
   }
   
   .rc-slider-handle-active:active {
-    border-color: #6C757D;
+    border-color: #63C9C4;
   }
 
