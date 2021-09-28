@@ -35,7 +35,7 @@ time_periods = {1:ytd, 2:ttm, 3:t_minus_90, 4:t_minus_30}
 # -----------------------------------------------------------
 # Data Processing
 
-FILEPATH = './data/TTM_tax_lots_090321.csv'
+FILEPATH = './data/TTM_tax_lots_092821.csv'
 
 tax_lot_df = pd.read_csv(FILEPATH,
             usecols=[
