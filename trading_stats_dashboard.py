@@ -5,8 +5,7 @@ import datetime
 
 import dash
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 from dash.dependencies import Input, Output
 from pandas.io.formats import style
 
@@ -35,7 +34,7 @@ time_periods = {1:ytd, 2:ttm, 3:t_minus_90, 4:t_minus_30}
 # -----------------------------------------------------------
 # Data Processing
 
-FILEPATH = './data/TTM_tax_lots_092821.csv'
+FILEPATH = './data/TTM_tax_lots_110821.csv'
 
 tax_lot_df = pd.read_csv(FILEPATH,
             usecols=[
@@ -63,7 +62,7 @@ tax_lot_df['closing_date'] = tax_lot_df['closing_date'].astype('Datetime64')
 
 tax_lot_df['pct_gain/loss'] = round((tax_lot_df['gain'] / tax_lot_df['total_cost']) * 100, 2)
 
-tax_lot_df['category'] = pd.cut(tax_lot_df.gain, bins=[-5000, .0001, 5000],
+tax_lot_df['category'] = pd.cut(tax_lot_df.gain, bins=[-5000, -.000001, 5000],
     labels=['loss','gain'])
 
 # # -----------------------------------------------------------
@@ -211,7 +210,7 @@ def update_reward_risk(jsonified_cleaned_data):
 
     df = pd.read_json(jsonified_cleaned_data)
 
-    winning_trades = df[df['gain']> 0]
+    winning_trades = df[df['gain']>= 0]
     losing_trades = df[df['gain'] < 0]
 
     total_winning_trades = winning_trades.shape[0]
