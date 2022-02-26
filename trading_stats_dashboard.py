@@ -1,3 +1,5 @@
+# risk model: https://marderreport.com/creating-a-risk-model/
+
 from numpy.lib.function_base import median
 import pandas as pd
 import numpy as np
@@ -34,7 +36,7 @@ time_periods = {1:ytd, 2:ttm, 3:t_minus_90, 4:t_minus_30}
 # -----------------------------------------------------------
 # Data Processing
 
-FILEPATH = './data/TTM_tax_lots_110821.csv'
+FILEPATH = './data/TTM_tax_lots_022522.csv'
 
 tax_lot_df = pd.read_csv(FILEPATH,
             usecols=[
@@ -120,8 +122,8 @@ app.layout = dbc.Container([
                             dbc.Card(
                                 dbc.CardBody(
                                     [   
-                                        html.H6("Winning Trades"), #className="card-subtitle"),
-                                        html.H4("Title", id='total_winning'),
+                                        html.H6("Winning / Losing"), #className="card-subtitle"),
+                                        html.H4("Title", id='pct_winning_losing'),
                                     ]
                                 ),
                                 style={'text-align':'center'}
@@ -131,8 +133,19 @@ app.layout = dbc.Container([
                             dbc.Card(
                                 dbc.CardBody(
                                     [   
-                                        html.H6("Losing Trades"), #className="card-subtitle"),
-                                        html.H4("Title", id='total_losing'),
+                                        html.H6("Expectancy"), #className="card-subtitle"),
+                                        html.H4("Title", id='expectancy'),
+                                    ]
+                                ),
+                                style={'text-align':'center'}
+                                
+                            ),
+                            html.Br(),
+                            dbc.Card(
+                                dbc.CardBody(
+                                    [   
+                                        html.H6("R"), #className="card-subtitle"),
+                                        html.H4("Title", id='r_value'),
                                     ]
                                 ),
                                 style={'text-align':'center'}
@@ -203,8 +216,9 @@ def avg_gain(jsonified_cleaned_data):
     return fig
 
 @app.callback([Output('risk_reward_num', 'children'),
-            Output('total_winning', 'children'),
-            Output('total_losing', 'children')], 
+            Output('pct_winning_losing', 'children'),
+            Output('expectancy', 'children'),
+            Output('r_value', 'children')], 
             [Input('sub_df', 'data')])
 def update_reward_risk(jsonified_cleaned_data):
 
@@ -216,13 +230,37 @@ def update_reward_risk(jsonified_cleaned_data):
     total_winning_trades = winning_trades.shape[0]
     total_losing_trades = losing_trades.shape[0]
 
-    avg_gain = round(winning_trades['gain'].median(), 2)
-    avg_loss = abs(round(losing_trades['gain'].median(), 2))
+    pct_winning_trades = round(total_winning_trades/df.shape[0]*100)
+    pct_losing_trades = round(total_losing_trades/df.shape[0]*100)
 
-    reward_risk = round((total_winning_trades * avg_gain) / (total_losing_trades * avg_loss), 2)
-    return f'{reward_risk} : 1', \
-        f'{round(total_winning_trades/df.shape[0]*100)}%', \
-        f'{round(total_losing_trades/df.shape[0]*100)}%'
+    avg_amount_gain = round(winning_trades['gain'].median(), 2)
+    avg_amount_loss = abs(round(losing_trades['gain'].median(), 2))
+
+    avg_pct_gain = round(winning_trades['pct_gain/loss'].median(), 2)
+    avg_pct_loss = abs(round(losing_trades['pct_gain/loss'].median(), 2))
+
+    reward_risk = round((total_winning_trades * avg_amount_gain) / (total_losing_trades * avg_amount_loss), 2)
+    
+    # Expectancy = the average return of all your trades, 
+    # i.e. what you can expect to make every time you roll the dice, on average.
+    #(% of winning trades * avg winner) – (% of losing trades * avg loser)
+    expectancy = round(((pct_winning_trades * avg_pct_gain) - (pct_losing_trades * avg_pct_loss)), 4) / 100
+
+    # Frequency = the number of trades produced by the system each month or year.
+    frequency = round((df.shape[0] * .8), 2)
+
+    # objective = % return per month
+    objective = .1
+
+    # Risk model formula: Objective = Expectancy * R * Frequency
+    # what percent risk, i.e. “R,” you should be using in order to achieve your 
+    # monthly or annual return objective
+    R = round((objective / expectancy / frequency), 4) * 100
+
+    return  f'{reward_risk} : 1', \
+            f'{pct_winning_trades}% / {pct_losing_trades}%', \
+            f'{expectancy:0.2f}%', \
+            f'{R:0.2f}%'
 
 # -----------------------------------------------------------
 if __name__ == "__main__":
