@@ -1,6 +1,6 @@
 # risk model: https://marderreport.com/creating-a-risk-model/
+# https://www.vantharp.com/trading/wp-content/uploads/2018/06/A_Short_Lesson_on_R_and_R-multiple.pdf
 
-from numpy.lib.function_base import median
 import pandas as pd
 import numpy as np
 import datetime
@@ -12,6 +12,7 @@ from dash.dependencies import Input, Output
 from pandas.io.formats import style
 
 import plotly.express as px
+from plotly.figure_factory import create_distplot
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
@@ -31,12 +32,12 @@ t_minus_90 = today - datetime.timedelta(90)
 
 ttm = today - datetime.timedelta(365)
 
-time_periods = {1:ytd, 2:ttm, 3:t_minus_90, 4:t_minus_30}
+time_periods = {1:ttm, 2:t_minus_90, 3:t_minus_30, 4:ytd}
 
 # -----------------------------------------------------------
 # Data Processing
-
-FILEPATH = './data/TTM_tax_lots_022522.csv'
+DATE = '033122'
+FILEPATH = f'./data/TTM_tax_lots_{DATE}.csv'
 
 tax_lot_df = pd.read_csv(FILEPATH,
             usecols=[
@@ -64,7 +65,7 @@ tax_lot_df['closing_date'] = tax_lot_df['closing_date'].astype('Datetime64')
 
 tax_lot_df['pct_gain/loss'] = round((tax_lot_df['gain'] / tax_lot_df['total_cost']) * 100, 2)
 
-tax_lot_df['category'] = pd.cut(tax_lot_df.gain, bins=[-5000, -.000001, 5000],
+tax_lot_df['category'] = pd.cut(tax_lot_df.gain, bins=[-5000, -0.000001, 5000],
     labels=['loss','gain'])
 
 # # -----------------------------------------------------------
@@ -84,10 +85,10 @@ app.layout = dbc.Container([
             max=4,
             step=None,
             marks={
-                1 : 'YTD',
-                2 : 'TTM',
-                3 : '90D',
-                4 : '30D',
+                1 : 'TTM',
+                2 : '90D',
+                3 : '30D',
+                4 : 'YTD',
             },
             value=1,
         ),
@@ -105,7 +106,7 @@ app.layout = dbc.Container([
                     dbc.Col(    
                         [   
                             html.Br(),
-                            html.Br(),
+                            # html.Br(),
                             dbc.Card(
                                 dbc.CardBody(
                                     [   
@@ -151,6 +152,17 @@ app.layout = dbc.Container([
                                 style={'text-align':'center'}
                                 
                             ),
+                            html.Br(),
+                            dbc.Card(
+                                dbc.CardBody(
+                                    [   
+                                        html.H6("Last 10 Trades"), #className="card-subtitle"),
+                                        html.H4("Title", id='ten_trades'),
+                                    ]
+                                ),
+                                style={'text-align':'center'}
+                                
+                            ),
                             #
                         ],
                         width = {'size':2, #'offset':1
@@ -187,6 +199,7 @@ def avg_gain(jsonified_cleaned_data):
     fig =px.histogram(
         df.sort_values(by='category'), x="pct_gain/loss",
         marginal='box', color='category',
+        #histnorm = 'density',
         nbins=int(df.shape[0] / 2),
         color_discrete_map = {'gain':'#63C9C4', 'loss':'gray'},
 
@@ -211,14 +224,21 @@ def avg_gain(jsonified_cleaned_data):
     fig.add_annotation(text=f"Max Loss: <br>{round(min(loss_df['pct_gain/loss']))}%",
                   xref="paper", yref="paper",
                   x=0, y=-0.2, showarrow=False)
-                  
+
+    # fig.add_trace(create_distplot(
+    #     [df.sort_values(by='category')["pct_gain/loss"].values], 
+    #     group_labels=['values'],
+    #     show_hist=False, 
+    #     ))
+    # print(df.sort_values(by='category')["pct_gain/loss"].values)
 
     return fig
 
 @app.callback([Output('risk_reward_num', 'children'),
             Output('pct_winning_losing', 'children'),
             Output('expectancy', 'children'),
-            Output('r_value', 'children')], 
+            Output('r_value', 'children'),
+            Output('ten_trades', 'children')], 
             [Input('sub_df', 'data')])
 def update_reward_risk(jsonified_cleaned_data):
 
@@ -257,10 +277,16 @@ def update_reward_risk(jsonified_cleaned_data):
     # monthly or annual return objective
     R = round((objective / expectancy / frequency), 4) * 100
 
+    closing_date_sorted = df[['closing_date', 'gain']].sort_values(by='closing_date')
+    last_ten = closing_date_sorted.tail(10)
+    last_ten_pos = last_ten[last_ten['gain'] >= 0].shape[0]
+    last_ten_neg = last_ten[last_ten['gain'] < 0].shape[0]
+
     return  f'{reward_risk} : 1', \
             f'{pct_winning_trades}% / {pct_losing_trades}%', \
             f'{expectancy:0.2f}%', \
-            f'{R:0.2f}%'
+            f'{R:0.2f}%', \
+            f'{last_ten_pos} : {last_ten_neg}'
 
 # -----------------------------------------------------------
 if __name__ == "__main__":
