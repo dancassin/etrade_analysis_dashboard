@@ -99,10 +99,18 @@ app.layout = dbc.Container([
         [
             dbc.Row(
                 [
-                    dbc.Col(
-                        dcc.Graph(id='gain_hist'),
-                        width={'size':9},
-                    ),
+                    dbc.Col([
+                        dbc.Row(
+                            
+                                dcc.Graph(id='gain_hist', style={'height': '40vh'}),
+                                #width={'size':9},
+                            ),
+                        dbc.Row(
+                            
+                                dcc.Graph(id='equity', style={'height': '40vh'}),
+                                #width={'size':9},
+                            ),
+                    ]),
                     dbc.Col(    
                         [   
                             html.Br(),
@@ -233,6 +241,41 @@ def avg_gain(jsonified_cleaned_data):
     # print(df.sort_values(by='category')["pct_gain/loss"].values)
 
     return fig
+
+@app.callback(Output('equity', 'figure'),
+                [Input('sub_df', 'data')])
+def equity_graph(jsonified_cleaned_data):
+
+    df = pd.read_json(jsonified_cleaned_data)
+    #df['closing_date'] = df['closing_date'].astype('datetime64[ns]')
+    df = df[['closing_date', 'gain']].groupby(by='closing_date').sum()
+    df = df.sort_values(by='closing_date').reset_index()
+    df['cumulative'] = df.gain.cumsum()
+    
+    fig =px.line(
+        df, 
+        x='closing_date', 
+        y='cumulative', 
+    )
+
+    #fig.update_xaxes(visible=False)
+
+    fig.update_layout(
+        xaxis_title_text= 'Cumulative Gains', # xaxis label
+        xaxis_showticklabels = False,
+        yaxis_title_text='', # yaxis label
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,
+        # legend_x=.8,
+        # legend_y=.5,
+    )
+    
+
+    fig.data[0].line.color = '#63C9C4'
+    return fig
+
+
 
 @app.callback([Output('risk_reward_num', 'children'),
             Output('pct_winning_losing', 'children'),
