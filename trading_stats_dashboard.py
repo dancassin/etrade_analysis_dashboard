@@ -36,23 +36,39 @@ time_periods = {1:ttm, 2:t_minus_90, 3:t_minus_30, 4:ytd}
 
 # -----------------------------------------------------------
 # Data Processing
-DATE = '033122'
+DATE = '042522' #MMDDYY
 FILEPATH = f'./data/TTM_tax_lots_{DATE}.csv'
 
 tax_lot_df = pd.read_csv(FILEPATH,
-            usecols=[
-                'Symbol', 'Quantity', 'Opening Date', 'Cost/Share $', 'Total Cost $',
-                'Closing Date',	'Price/Share $', 'Proceeds $', 'Gain $'],
-            skiprows=13,
+            # usecols=[
+            #     'Symbol', 'Quantity', 'Opening Date', 'Cost/Share $', 'Total Cost $',
+            #     'Closing Date',	'Price/Share $', 'Proceeds $', 'Gain $'],
+            skiprows=14,
             delimiter=',',
+            sep=",|\s",
+            header=None,
             skipfooter=2,
             engine='python'
 )
 
-# column formatting and selection
-tax_lot_df.rename(columns = lambda x: x.lower().replace('$', '').strip().replace(' ','_'), inplace=True)
+tax_lot_df.rename(columns={
+    0:'symbol', 
+    1:'quantity', 
+    2:'opening_date', 
+    3:'cost/share', 
+    4:'total_cost',
+    5:'closing_date',	
+    6:'price/share', 
+    7:'proceeds', 
+    8:'gain',
+},
+inplace=True)
 
-# replacing double dashes in symbol column with NaN and forward filling the stock ticker
+tax_lot_df = tax_lot_df[['symbol', 'quantity', 'opening_date', 'cost/share', 'total_cost', 
+    'closing_date', 'price/share', 'proceeds', 'gain', ]]
+
+# replacing double dashes in the entire df 
+# and replacing 'Sell' in symbol column with NaN and forward filling the stock ticker
 tax_lot_df = tax_lot_df.replace('--', np.nan)
 tax_lot_df['symbol']= tax_lot_df['symbol'].str.strip()
 tax_lot_df['symbol'].replace('Sell', np.nan, inplace=True)
@@ -60,6 +76,8 @@ tax_lot_df['symbol'] = tax_lot_df['symbol'].ffill()
 
 tax_lot_df.dropna(subset=['opening_date'], inplace=True)
 
+#-------------------------------------------------------
+# Feature Engineering
 tax_lot_df['opening_date'] = tax_lot_df['opening_date'].astype('Datetime64')
 tax_lot_df['closing_date'] = tax_lot_df['closing_date'].astype('Datetime64')
 
@@ -67,6 +85,8 @@ tax_lot_df['pct_gain/loss'] = round((tax_lot_df['gain'] / tax_lot_df['total_cost
 
 tax_lot_df['category'] = pd.cut(tax_lot_df.gain, bins=[-5000, -0.000001, 5000],
     labels=['loss','gain'])
+
+print(tax_lot_df.head())
 
 # # -----------------------------------------------------------
 # # Layout
@@ -96,7 +116,7 @@ app.layout = dbc.Container([
     ]),
     # html.Div(id='slider-drag-output'),
     html.Div(
-        [
+        [       
             dbc.Row(
                 [
                     dbc.Col([
@@ -228,10 +248,10 @@ def avg_gain(jsonified_cleaned_data):
 
     fig.add_annotation(text=f"Max Gain: <br>{round(max(gain_df['pct_gain/loss']))}%",
                   xref="paper", yref="paper",
-                  x=1, y=-0.2, showarrow=False)
+                  x=1, y=-0.35, showarrow=False)
     fig.add_annotation(text=f"Max Loss: <br>{round(min(loss_df['pct_gain/loss']))}%",
                   xref="paper", yref="paper",
-                  x=0, y=-0.2, showarrow=False)
+                  x=0, y=-0.35, showarrow=False)
 
     # fig.add_trace(create_distplot(
     #     [df.sort_values(by='category')["pct_gain/loss"].values], 
